@@ -1,221 +1,44 @@
-import { useEffect, useRef } from 'react'
+import {useEffect,useRef} from 'react'
 import * as THREE from 'three'
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import type { ObservationMarker, SliceResponse, VolumeResponse } from '../lib/api'
-import { normalizeScalarRange } from '../lib/volume'
+import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js'
+import type {FieldCatalogItem,ObservationMarker,ProfileResponse,SliceResponse,VectorFieldResponse,VolumeResponse} from '../lib/api'
+import {normalizeScalarRange,paletteCss} from '../lib/volume'
 
-type Props = {
-  volume: VolumeResponse | null
-  slice: SliceResponse | null
-  mode: 'volume' | 'slice'
-  opacity: number
-  verticalExaggeration: number
-  selected: ObservationMarker | null
-  onSelect: (marker: ObservationMarker) => void
-  observations: ObservationMarker[]
+type Props={view:'globe'|'slice'|'volume'|'section'|'iso';field:FieldCatalogItem|null;volume:VolumeResponse|null;slice:SliceResponse|null;currents:VectorFieldResponse|null;observations:ObservationMarker[];selected:ObservationMarker|null;profile:ProfileResponse|null;opacity:number;exaggeration:number;onSelect:(m:ObservationMarker)=>void}
+const V=`varying vec3 p;void main(){p=position*.5+.5;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`
+const F=`uniform sampler3D tex;uniform float opacity;uniform float steps;varying vec3 p;vec3 pal(float t){t=clamp(t,0.,1.);vec3 a=vec3(.03,.12,.34),b=vec3(.02,.63,.72),c=vec3(.96,.75,.18),d=vec3(.75,.06,.05);if(t<.33)return mix(a,b,t/.33);if(t<.66)return mix(b,c,(t-.33)/.33);return mix(c,d,(t-.66)/.34);}void main(){vec3 q=p;vec3 dir=normalize(vec3(.24,.31,1.));vec4 a=vec4(0.);float s=1./steps;for(float i=0.;i<256.;i++){if(i>=steps||any(lessThan(q,vec3(0.)))||any(greaterThan(q,vec3(1.))))break;float x=texture(tex,q).r;float al=smoothstep(.04,.75,x)*opacity*.075;a.rgb+=(1.-a.a)*pal(x)*al;a.a+=(1.-a.a)*al;if(a.a>.96)break;q+=dir*s;}if(a.a<.008)discard;gl_FragColor=a;}`
+function geo(lat:number,lon:number,r=2){const p=THREE.MathUtils.degToRad(lat),l=THREE.MathUtils.degToRad(lon);return new THREE.Vector3(r*Math.cos(p)*Math.cos(l),r*Math.sin(p),r*Math.cos(p)*Math.sin(l))}
+function makeMarkers(markers:ObservationMarker[],selected:ObservationMarker|null,onSelect:(m:ObservationMarker)=>void){const g=new THREE.Group();for(const m of markers){const s=new THREE.Mesh(new THREE.SphereGeometry(selected?.platform===m.platform?.048:.027,10,8),new THREE.MeshBasicMaterial({color:selected?.platform===m.platform?0xffd166:0x58e7f4}));s.position.copy(geo(m.latitude,m.longitude,2.045));s.userData.marker=m;g.add(s)}return g}
+function makeFieldTexture(slice:SliceResponse){const c=document.createElement('canvas');c.width=720;c.height=360;const ctx=c.getContext('2d')!;const image=ctx.createImageData(c.width,c.height);const vals=normalizeScalarRange(slice.values,slice.bounds.min,slice.bounds.max,'linear',slice.missing_value);const ny=slice.shape[0],nx=slice.shape[1];for(let y=0;y<ny;y++)for(let x=0;x<nx;x++){const value=vals[y*nx+x];if(value<0)continue;const lon=slice.longitude[x],lat=slice.latitude[y];const px=Math.round((lon+180)/360*(c.width-1)),py=Math.round((90-lat)/180*(c.height-1));const col=new THREE.Color(paletteCss(value));for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){const xx=px+dx,yy=py+dy;if(xx<0||xx>=c.width||yy<0||yy>=c.height)continue;const i=(yy*c.width+xx)*4;image.data[i]=col.r*255;image.data[i+1]=col.g*255;image.data[i+2]=col.b*255;image.data[i+3]=210}}ctx.putImageData(image,0,0);return new THREE.CanvasTexture(c)}
+function makeCurrents(v:VectorFieldResponse){const g=new THREE.Group();const lat=v.latitude,lon=v.longitude;const ny=lat.length,nx=lon.length;for(let y=0;y<ny;y+=3)for(let x=0;x<nx;x+=3){const i=y*nx+x,u=v.u[i],w=v.v[i];if(u===-9999||w===-9999||!Number.isFinite(u+w))continue;const a=geo(lat[y],lon[x],2.035);const scale=.34;const b=geo(lat[y]+w*scale,lon[x]+u*scale,2.035);g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([a,b]),new THREE.LineBasicMaterial({color:0xffd166,transparent:true,opacity:.72})));}return g}
+function makeIso(volume:VolumeResponse){
+ const [nz,ny,nx]=volume.shape; const vals=normalizeScalarRange(volume.values,volume.bounds.min,volume.bounds.max,'linear',volume.missing_value); const pos:number[]=[];
+ const t=.58;
+ const tet=[[0,1,2,6],[0,2,3,6],[0,3,7,6],[0,7,4,6],[0,4,5,6],[0,5,1,6]];
+ const corners=[[0,0,0],[1,0,0],[1,1,0],[0,1,0],[0,0,1],[1,0,1],[1,1,1],[0,1,1]];
+ const point=(x:number,y:number,z:number)=>new THREE.Vector3((x/(nx-1)-.5)*3.2,(.5-z/(nz-1))*1.6,(y/(ny-1)-.5)*2.2);
+ const val=(x:number,y:number,z:number)=>vals[z*ny*nx+y*nx+x];
+ const interp=(a:number[],b:number[],va:number,vb:number)=>{const q=va===vb?.5:THREE.MathUtils.clamp((t-va)/(vb-va),0,1);return point(a[0]+(b[0]-a[0])*q,a[1]+(b[1]-a[1])*q,a[2]+(b[2]-a[2])*q)};
+ for(let z=0;z<nz-1;z++)for(let y=0;y<ny-1;y++)for(let x=0;x<nx-1;x++){
+   const cv=corners.map(c=>val(x+c[0],y+c[1],z+c[2])); if(cv.some(v=>v<0)) continue;
+   for(const ti of tet){const ids=ti.map(i=>i); const inside=ids.filter(i=>cv[i]>=t), outside=ids.filter(i=>cv[i]<t); if(inside.length===0||inside.length===4)continue;
+     if(inside.length===1||inside.length===3){const one=inside.length===1?inside[0]:outside[0];const others=(inside.length===1?outside:inside);const a=interp(corners[one],corners[others[0]],cv[one],cv[others[0]]),b=interp(corners[one],corners[others[1]],cv[one],cv[others[1]]),c=interp(corners[one],corners[others[2]],cv[one],cv[others[2]]); if(inside.length===1)pos.push(a.x,a.y,a.z,b.x,b.y,b.z,c.x,c.y,c.z); else pos.push(a.x,a.y,a.z,c.x,c.y,c.z,b.x,b.y,b.z);
+     } else {const [a,b]=inside,[c,d]=outside;const p1=interp(corners[a],corners[c],cv[a],cv[c]),p2=interp(corners[a],corners[d],cv[a],cv[d]),p3=interp(corners[b],corners[c],cv[b],cv[c]),p4=interp(corners[b],corners[d],cv[b],cv[d]);pos.push(p1.x,p1.y,p1.z,p2.x,p2.y,p2.z,p3.x,p3.y,p3.z,p2.x,p2.y,p2.z,p4.x,p4.y,p4.z,p3.x,p3.y,p3.z);}
+   }
+ }
+ const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.computeVertexNormals();return new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0xffbd4a,transparent:true,opacity:.78,side:THREE.DoubleSide,roughness:.72,metalness:.05}));
 }
-
-const vertexShader = `
-varying vec3 vPosition;
-void main() {
-  vPosition = position * 0.5 + 0.5;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}
-`
-
-const fragmentShader = `
-uniform sampler3D uVolume;
-uniform vec3 uCamera;
-uniform vec3 uSize;
-uniform float uOpacity;
-uniform float uSteps;
-varying vec3 vPosition;
-
-vec3 palette(float t) {
-  t = clamp(t, 0.0, 1.0);
-  vec3 c0 = vec3(0.02, 0.18, 0.35);
-  vec3 c1 = vec3(0.02, 0.55, 0.72);
-  vec3 c2 = vec3(0.92, 0.72, 0.24);
-  vec3 c3 = vec3(0.94, 0.23, 0.12);
-  if (t < 0.33) return mix(c0, c1, t / 0.33);
-  if (t < 0.66) return mix(c1, c2, (t - 0.33) / 0.33);
-  return mix(c2, c3, (t - 0.66) / 0.34);
-}
-
-void main() {
-  vec3 rayDir = normalize(uCamera - vPosition);
-  float stepSize = 1.0 / uSteps;
-  vec3 pos = vPosition;
-  vec4 accum = vec4(0.0);
-  for (float i = 0.0; i < 256.0; i += 1.0) {
-    if (i >= uSteps || any(lessThan(pos, vec3(0.0))) || any(greaterThan(pos, vec3(1.0)))) break;
-    float scalar = texture(uVolume, pos).r;
-    float density = smoothstep(0.08, 0.78, scalar) * uOpacity;
-    vec3 color = palette(scalar);
-    float alpha = density * 0.055;
-    accum.rgb += (1.0 - accum.a) * color * alpha;
-    accum.a += (1.0 - accum.a) * alpha;
-    if (accum.a > 0.96) break;
-    pos += rayDir * stepSize;
-  }
-  if (accum.a < 0.015) discard;
-  gl_FragColor = accum;
-}
-`
-
-function buildVolumeTexture(volume: VolumeResponse) {
-  const [nz, ny, nx] = volume.shape
-  const data = normalizeScalarRange(volume.values, volume.bounds.min, volume.bounds.max, 'linear', volume.missing_value)
-  const texture = new THREE.Data3DTexture(data, nx, ny, nz)
-  texture.format = THREE.RedFormat
-  texture.type = THREE.FloatType
-  texture.minFilter = THREE.LinearFilter
-  texture.magFilter = THREE.LinearFilter
-  texture.unpackAlignment = 1
-  texture.needsUpdate = true
-  return texture
-}
-
-function addMarkers(scene: THREE.Object3D, markers: ObservationMarker[], selected: ObservationMarker | null, onSelect: (marker: ObservationMarker) => void) {
-  const group = new THREE.Group()
-  markers.forEach((marker) => {
-    const geometry = new THREE.SphereGeometry(selected?.platform === marker.platform ? 0.045 : 0.028, 12, 8)
-    const material = new THREE.MeshBasicMaterial({ color: selected?.platform === marker.platform ? 0xffc857 : 0x72d6ff })
-    const mesh = new THREE.Mesh(geometry, material)
-    mesh.position.set((marker.longitude - 75) / 30, 0.5, -(marker.latitude - 8) / 18)
-    mesh.userData.marker = marker
-    mesh.userData.onSelect = onSelect
-    group.add(mesh)
-  })
-  scene.add(group)
-  return group
-}
-
-export function OceanScene({ volume, slice, mode, opacity, verticalExaggeration, selected, onSelect, observations }: Props) {
-  const hostRef = useRef<HTMLDivElement | null>(null)
-  const stateRef = useRef<{ scene: THREE.Scene; camera: THREE.PerspectiveCamera; renderer: THREE.WebGLRenderer; controls: OrbitControls; root: THREE.Group } | null>(null)
-
-  useEffect(() => {
-    if (!hostRef.current) return
-    const host = hostRef.current
-    const scene = new THREE.Scene()
-    scene.background = new THREE.Color('#061019')
-    const camera = new THREE.PerspectiveCamera(45, host.clientWidth / Math.max(1, host.clientHeight), 0.01, 100)
-    camera.position.set(2.2, 1.5, 2.4)
-    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' })
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75))
-    renderer.setSize(host.clientWidth, host.clientHeight)
-    renderer.outputColorSpace = THREE.SRGBColorSpace
-    host.appendChild(renderer.domElement)
-    const controls = new OrbitControls(camera, renderer.domElement)
-    controls.enableDamping = true
-    controls.minDistance = 1.4
-    controls.maxDistance = 6
-    const root = new THREE.Group()
-    scene.add(root)
-    stateRef.current = { scene, camera, renderer, controls, root }
-
-    const onResize = () => {
-      camera.aspect = host.clientWidth / Math.max(1, host.clientHeight)
-      camera.updateProjectionMatrix()
-      renderer.setSize(host.clientWidth, host.clientHeight)
-    }
-    const observer = new ResizeObserver(onResize)
-    observer.observe(host)
-    const raycaster = new THREE.Raycaster()
-    const pointer = new THREE.Vector2()
-    const onPointer = (event: PointerEvent) => {
-      const rect = renderer.domElement.getBoundingClientRect()
-      pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
-      pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
-      raycaster.setFromCamera(pointer, camera)
-      const hits = raycaster.intersectObjects(root.children, true)
-      const marker = hits.find((hit) => hit.object.userData.marker)?.object.userData.marker as ObservationMarker | undefined
-      if (marker) onSelect(marker)
-    }
-    renderer.domElement.addEventListener('pointerup', onPointer)
-    let frame = 0
-    const animate = () => {
-      frame = requestAnimationFrame(animate)
-      controls.update()
-      root.traverse((object) => {
-        const material = (object as THREE.Mesh).material
-        if (material && !Array.isArray(material) && material instanceof THREE.ShaderMaterial && material.uniforms.uCamera) {
-          const height = Math.max(0.1, 1.4 * verticalExaggeration)
-          material.uniforms.uCamera.value.set(camera.position.x / 2 + 0.5, camera.position.y / height + 0.5, camera.position.z / 2 + 0.5)
-        }
-      })
-      renderer.render(scene, camera)
-    }
-    animate()
-    return () => {
-      cancelAnimationFrame(frame)
-      observer.disconnect()
-      renderer.domElement.removeEventListener('pointerup', onPointer)
-      controls.dispose()
-      renderer.dispose()
-      host.removeChild(renderer.domElement)
-      stateRef.current = null
-    }
-  }, [onSelect])
-
-  useEffect(() => {
-    const state = stateRef.current
-    if (!state) return
-    const { root } = state
-    while (root.children.length) root.remove(root.children[0])
-
-    const markerGroup = addMarkers(root, observations, selected, onSelect)
-    markerGroup.position.y = 0
-
-    const outline = new THREE.LineSegments(
-      new THREE.EdgesGeometry(new THREE.BoxGeometry(2, 1.4 * verticalExaggeration, 2)),
-      new THREE.LineBasicMaterial({ color: 0x31505f, transparent: true, opacity: 0.75 }),
-    )
-    outline.position.y = 0
-    root.add(outline)
-
-    if (mode === 'volume' && volume) {
-      const texture = buildVolumeTexture(volume)
-      const material = new THREE.ShaderMaterial({
-        uniforms: {
-          uVolume: { value: texture },
-          uCamera: { value: new THREE.Vector3(1.1, 1.0, 1.2) },
-          uSize: { value: new THREE.Vector3(volume.shape[2], volume.shape[1], volume.shape[0]) },
-          uOpacity: { value: opacity },
-          uSteps: { value: Math.min(180, Math.max(48, volume.shape[0] * 10)) },
-        },
-        vertexShader,
-        fragmentShader,
-        side: THREE.BackSide,
-        transparent: true,
-        depthWrite: false,
-      })
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(2, 1.4 * verticalExaggeration, 2), material)
-      root.add(mesh)
-      return () => { texture.dispose(); material.dispose(); mesh.geometry.dispose() }
-    }
-
-    if (slice) {
-      const geometry = new THREE.PlaneGeometry(2, 2, Math.max(1, slice.shape[1] - 1), Math.max(1, slice.shape[0] - 1))
-      geometry.rotateX(-Math.PI / 2)
-      const colors = normalizeScalarRange(slice.values, slice.bounds.min, slice.bounds.max, 'linear', slice.missing_value)
-      const colorAttr = new Float32Array(colors.length * 3)
-      for (let i = 0; i < colors.length; i += 1) {
-        const t = colors[i]
-        colorAttr[i * 3] = 0.02 + 0.9 * Math.max(0, t - 0.35)
-        colorAttr[i * 3 + 1] = 0.18 + 0.7 * Math.min(1, t * 1.5)
-        colorAttr[i * 3 + 2] = 0.5 + 0.45 * (1 - t)
-      }
-      geometry.setAttribute('color', new THREE.Float32BufferAttribute(colorAttr, 3))
-      const material = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity })
-      const plane = new THREE.Mesh(geometry, material)
-      plane.scale.set(1, 1, verticalExaggeration)
-      plane.position.y = 0.6 - (slice.depth / 1000) * 1.2 * verticalExaggeration
-      root.add(plane)
-      return () => { geometry.dispose(); material.dispose() }
-    }
-  }, [mode, volume, slice, opacity, verticalExaggeration, observations, selected, onSelect])
-
-  return <div ref={hostRef} className="ocean-scene" aria-label="Interactive 3D ocean field" />
-}
+function makeSection(volume:VolumeResponse){const [nz,ny,nx]=volume.shape;const vals=normalizeScalarRange(volume.values,volume.bounds.min,volume.bounds.max,'linear',volume.missing_value);const mid=Math.floor(ny/2);const p:number[]=[];const colors:number[]=[];for(let z=0;z<nz-1;z++)for(let x=0;x<nx-1;x++){const ids=[z*ny*nx+mid*nx+x,z*ny*nx+mid*nx+x+1,(z+1)*ny*nx+mid*nx+x+1,(z+1)*ny*nx+mid*nx+x];const xx=[x,x+1,x+1,x],zz=[z,z,z+1,z+1];const tri=[0,1,2,0,2,3];for(const k of tri){const i=ids[k];const v=vals[i];p.push((xx[k]/(nx-1)-.5)*3.6,.02,(.55-zz[k]/(nz-1))*2.5);const col=new THREE.Color(v<0?'#14252d':paletteCss(v));colors.push(col.r,col.g,col.b)}}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(p,3));g.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));g.computeVertexNormals();return new THREE.Mesh(g,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide,transparent:true,opacity:.95}));}
+export function OceanScene({view,field,volume,slice,currents,observations,selected,profile,opacity,exaggeration,onSelect}:Props){const ref=useRef<HTMLDivElement>(null);const state=useRef<any>(null)
+useEffect(()=>{if(!ref.current)return;const host=ref.current,scene=new THREE.Scene();scene.background=new THREE.Color('#02080d');const cam=new THREE.PerspectiveCamera(42,host.clientWidth/Math.max(1,host.clientHeight),.01,100);cam.position.set(3.7,2.1,4.2);const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.setSize(host.clientWidth,host.clientHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;host.appendChild(renderer.domElement);const controls=new OrbitControls(cam,renderer.domElement);controls.enableDamping=true;controls.minDistance=2.15;controls.maxDistance=12;const root=new THREE.Group();scene.add(root);state.current={scene,cam,renderer,controls,root};const resize=()=>{cam.aspect=host.clientWidth/Math.max(1,host.clientHeight);cam.updateProjectionMatrix();renderer.setSize(host.clientWidth,host.clientHeight)};const ro=new ResizeObserver(resize);ro.observe(host);let raf=0;const tick=()=>{raf=requestAnimationFrame(tick);controls.update();renderer.render(scene,cam)};tick();return()=>{cancelAnimationFrame(raf);ro.disconnect();controls.dispose();renderer.dispose();host.removeChild(renderer.domElement);state.current=null}},[])
+useEffect(()=>{const s=state.current;if(!s)return;const {root}=s;while(root.children.length){const o=root.children.pop();if(o)o.traverse((x:any)=>{x.geometry?.dispose?.();x.material?.dispose?.();x.material?.map?.dispose?.()})}
+const globe=new THREE.Mesh(new THREE.SphereGeometry(2,96,64),new THREE.MeshBasicMaterial({color:0x061923,wireframe:view==='volume'||view==='iso',transparent:true,opacity:(view==='volume'||view==='iso')?.28:1}));root.add(globe)
+if(slice&&field&&field.id!=='currents'&&view!=='volume'){const tex=makeFieldTexture(slice);globe.material=new THREE.MeshBasicMaterial({map:tex,transparent:true,opacity:.92});globe.material.needsUpdate=true}
+root.add(makeMarkers(observations,selected,onSelect))
+if(currents&&field?.id==='currents')root.add(makeCurrents(currents))
+if(view==='volume'&&volume&&volume.shape[0]>1){const data=normalizeScalarRange(volume.values,volume.bounds.min,volume.bounds.max,'linear',volume.missing_value);const tex=new THREE.Data3DTexture(data,volume.shape[2],volume.shape[1],volume.shape[0]);tex.format=THREE.RedFormat;tex.type=THREE.FloatType;tex.minFilter=THREE.LinearFilter;tex.magFilter=THREE.LinearFilter;tex.unpackAlignment=1;tex.needsUpdate=true;const mat=new THREE.ShaderMaterial({uniforms:{tex:{value:tex},opacity:{value:opacity},steps:{value:Math.min(180,Math.max(72,volume.shape[0]*8))}},vertexShader:V,fragmentShader:F,side:THREE.BackSide,transparent:true,depthWrite:false});const box=new THREE.Mesh(new THREE.BoxGeometry(3.25,1.5*exaggeration,2.2),mat);box.position.y=-.05;root.add(box)}
+if(view==='iso'&&volume&&volume.shape[0]>1)root.add(makeIso(volume))
+if(view==='section'&&volume)root.add(makeSection(volume));
+},[view,field,volume,slice,currents,observations,selected,profile,opacity,exaggeration,onSelect])
+useEffect(()=>{const s=state.current;if(!s)return;const ray=new THREE.Raycaster(),p=new THREE.Vector2();const fn=(e:PointerEvent)=>{const r=s.renderer.domElement.getBoundingClientRect();p.x=((e.clientX-r.left)/r.width)*2-1;p.y=-((e.clientY-r.top)/r.height)*2+1;ray.setFromCamera(p,s.cam);const hit=ray.intersectObjects(s.root.children,true).find((h:any)=>h.object.userData.marker);if(hit)onSelect(hit.object.userData.marker)};s.renderer.domElement.addEventListener('pointerup',fn);return()=>s.renderer.domElement.removeEventListener('pointerup',fn)},[onSelect])
+return <div ref={ref} className="ocean-scene"/>}

@@ -68,3 +68,14 @@ PY
 ## Data honesty
 
 The UI labels the current temperature field as a deterministic demo fixture. The Argo adapter can query live IFREMER ERDDAP data. Copernicus acquisition is intentionally kept behind the backend/source-adapter boundary so the browser never receives raw NetCDF.
+
+## Current data sources
+
+The running demo is India-native and uses real INCOIS data:
+
+- **Temperature / salinity:** INCOIS ARGO Monthly Variational Analysis Methodology, CF-1.6, 23 depth levels over the Indian Ocean subset. These are objectively analysed Argo-derived fields, not a numerical forecast model.
+- **Surface currents:** INCOIS Ocean State Forecast `CURRENTS_IO_20260827.nc`, reduced only spatially from the authoritative NetCDF for browser serving; U/V vectors and timestamp are retained.
+- **Observations:** live Argo profiles from IFREMER/Argo ERDDAP.
+- **Numerical-model adapter:** INCOIS RSMC HYCOM is verified as the authoritative numerical-model target. The public file is ~9.9 GB and exposes TEMP, SALN, UVEL and VVEL at six depths. The VM cannot cache that whole file within its available disk budget, so the production architecture keeps HYCOM as a server-side subset/adapter rather than silently substituting VAM.
+
+The UI must label provenance and analysis-vs-model status accordingly.

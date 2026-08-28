@@ -22,3 +22,10 @@ HTTP smoke: `/`, `/api/health`, `/api/fields/temperature/volume`, `/api/observat
 ## Browser QA blocker
 
 Playwright Chromium 151 crashes with SIGSEGV in this VM before a page can attach, even with SwiftShader. Firefox also did not complete a Playwright attach during the initial probe. This is an environment/browser-runtime issue, not treated as evidence that the application itself is broken. A later QA pass must run on a stable browser runtime.
+
+## Data-source correction
+- [x] Verified INCOIS RSMC HYCOM public NetCDF: `RSMC_hycom_20260828.nc`; 28 times × 6 depths × 1384 × 1665; TEMP/SALN/UVEL/VVEL.
+- [x] Integrated INCOIS VAM real 4-D temperature/salinity cache.
+- [x] Integrated INCOIS OSF real surface U/V current cache.
+- [x] Removed production fixture/old CMEMS demo fields.
+- [ ] Remaining: deploy-time/server-side HYCOM subset adapter for true numerical-model volume fields; local VM lacks disk for the full ~9.9 GB file.

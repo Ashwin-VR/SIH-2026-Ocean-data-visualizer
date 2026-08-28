@@ -1,31 +1,3 @@
-export type ScaleMode = 'linear' | 'log'
-
-export function normalizeScalarRange(
-  values: readonly number[],
-  min: number,
-  max: number,
-  scale: ScaleMode = 'linear',
-  missingValue = -9999,
-): Float32Array {
-  if (!(max > min)) throw new Error('max must be greater than min')
-  const result = new Float32Array(values.length)
-  const logMin = Math.log10(Math.max(min, Number.EPSILON))
-  const logMax = Math.log10(Math.max(max, Number.EPSILON))
-  for (let i = 0; i < values.length; i += 1) {
-    const value = values[i]
-    if (!Number.isFinite(value) || value === missingValue) {
-      result[i] = 0
-      continue
-    }
-    if (scale === 'log') {
-      if (value <= 0 || min <= 0) {
-        result[i] = 0
-        continue
-      }
-      result[i] = Math.min(1, Math.max(0, (Math.log10(value) - logMin) / (logMax - logMin)))
-    } else {
-      result[i] = Math.min(1, Math.max(0, (value - min) / (max - min)))
-    }
-  }
-  return result
-}
+export type ScaleMode='linear'|'log'
+export function normalizeScalarRange(values:readonly number[],min:number,max:number,scale:ScaleMode='linear',missingValue=-9999){if(!(max>min))throw new Error('max must be greater than min');const out=new Float32Array(values.length);const lm=Math.log10(Math.max(min,Number.EPSILON)),lx=Math.log10(Math.max(max,Number.EPSILON));for(let i=0;i<values.length;i++){const v=values[i];if(!Number.isFinite(v)||v===missingValue){out[i]=0;continue}out[i]=scale==='log'&&v>0&&min>0?Math.min(1,Math.max(0,(Math.log10(v)-lm)/(lx-lm))):Math.min(1,Math.max(0,(v-min)/(max-min)))}return out}
+export function paletteCss(t:number){const stops:Array<[number,string]>=[[0,'#102a5c'],[.25,'#116f9b'],[.5,'#1bb7a3'],[.7,'#f0c34e'],[.86,'#ed743d'],[1,'#b8202d']];t=Math.max(0,Math.min(1,t));for(let i=1;i<stops.length;i++){if(t<=stops[i][0])return stops[i][1]}return stops.at(-1)![1]}

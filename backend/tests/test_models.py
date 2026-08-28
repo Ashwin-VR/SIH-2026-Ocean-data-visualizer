@@ -24,7 +24,7 @@ def test_field_metadata_requires_positive_down_depths():
 
 def test_volume_response_contains_flat_values_and_shape():
     response = VolumeResponse(
-        variable="temperature", shape=[2, 2, 2], values=[1.0] * 8,
+        variable="temperature", units="degC", shape=[2, 2, 2], values=[1.0] * 8,
         bounds={"min": 1.0, "max": 1.0}, missing_value=-9999.0,
         depth=[0, 100], latitude=[10, 11], longitude=[70, 71]
     )

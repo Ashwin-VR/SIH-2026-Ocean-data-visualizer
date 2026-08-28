@@ -1,12 +1,2 @@
-export function ProvenancePanel() {
-  return (
-    <div className="provenance-panel">
-      <div><span>DATA SOURCE</span><strong>Copernicus-shaped field fixture</strong></div>
-      <div><span>OBSERVATION</span><strong>Argo GDAC / IFREMER ERDDAP</strong></div>
-      <div><span>FIELD</span><strong>Temperature · °C</strong></div>
-      <div><span>VALID TIME</span><strong>2026-08-28 00:00 UTC</strong></div>
-      <div><span>DEPTH DATUM</span><strong>Positive down · metres</strong></div>
-      <div className="status"><i /> CACHED DEMO · LIVE ARGO PATH AVAILABLE</div>
-    </div>
-  )
-}
+import type {FieldCatalogItem} from '../lib/api'
+export function ProvenancePanel({field}:{field:FieldCatalogItem|null}){return <aside className="provenance"><div className="eyebrow">DATA LINEAGE</div><div className="prov-row"><span>FIELD</span><strong>{field?.label} · {field?.units}</strong></div><div className="prov-row"><span>SOURCE</span><strong>{field?.source}</strong></div><div className="prov-row"><span>TYPE</span><strong>{field?.kind}</strong></div><div className="prov-row"><span>OBSERVATIONS</span><strong>Argo GDAC → IFREMER ERDDAP</strong></div><div className="prov-row"><span>MODEL PATH</span><strong>CMEMS adapter ready · authenticated 3-D endpoint</strong></div><div className="live-badge">● REAL DATA PATH · NO SYNTHETIC FALLBACK IN UI</div></aside>}
