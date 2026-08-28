@@ -24,7 +24,7 @@ def open_cf_scalar_field(path: str | Path, variable: str) -> ScalarField:
     except ImportError as exc:
         raise RuntimeError("xarray is required for NetCDF ingestion; install backend[science]") from exc
 
-    with xr.open_dataset(path) as dataset:
+    with xr.open_dataset(path, decode_cf=True, mask_and_scale=True) as dataset:
         if variable not in dataset.data_vars:
             raise ValueError(f"variable {variable!r} not present in dataset")
         data = dataset[variable].squeeze(drop=True)

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -10,6 +10,7 @@ from .models import *
 from .scientific import make_slice, make_volume, metadata, sample_field, subset_field
 from .real_fields import load_incois_fields, load_incois_currents
 from .remote import fetch_field as fetch_remote_field, time_values
+from .ogc import wcs_capabilities, describe_coverage, coverage_netcdf, wms_capabilities, wms_map
 
 app=FastAPI(title='SIH26067 Ocean Analysis API',version='0.3.0')
 FRONTEND_DIST=Path(__file__).resolve().parents[2]/'frontend'/'dist'
@@ -36,6 +37,44 @@ if CURRENT_FIELD is not None: CATALOG.append(FieldCatalogItem(id='currents',labe
 
 @app.get('/',include_in_schema=False)
 def root(): return FileResponse(FRONTEND_DIST/'index.html') if FRONTEND_DIST.exists() else JSONResponse({'service':'sih26067-ocean-api'},503)
+
+
+
+@app.get('/ogc/wcs')
+async def ogc_wcs(request: Request, service: str = 'WCS', version: str = '2.0.1', request_type: str | None = Query(None, alias='request'), coverage_id: str | None = Query(None, alias='coverageId'), subset: list[str] = Query(default=[]), format: str = 'application/x-netcdf'):
+    op = (request_type or '').lower()
+    if op == 'getcapabilities' or not request_type:
+        return wcs_capabilities(str(request.base_url).rstrip('/'), FIELDS)
+    if op == 'describecoverage':
+        f = FIELDS.get(coverage_id or '')
+        if not f: return error_response(404, 'COVERAGE_NOT_FOUND', 'Unknown WCS coverage')
+        return describe_coverage(str(request.base_url).rstrip('/'), coverage_id or '', f)
+    if op == 'getcoverage':
+        f = FIELDS.get(coverage_id or '')
+        if not f: return error_response(404, 'COVERAGE_NOT_FOUND', 'Unknown WCS coverage')
+        return coverage_netcdf(coverage_id or '', f, subset, format)
+    return error_response(400, 'WCS_OPERATION_UNSUPPORTED', 'Supported WCS operations: GetCapabilities, DescribeCoverage, GetCoverage')
+
+@app.get('/ogc/wms')
+async def ogc_wms(request: Request, service: str = 'WMS', version: str = '1.3.0', request_type: str | None = Query(None, alias='request'), layers: str | None = None, bbox: str | None = None, width: int = 1024, height: int = 768, format: str = 'image/png', crs: str = 'EPSG:4326', depth: float = 0):
+    op=(request_type or 'GetCapabilities').lower()
+    if op == 'getcapabilities': return wms_capabilities(str(request.base_url).rstrip('/'), FIELDS)
+    if op != 'getmap': return error_response(400, 'WMS_OPERATION_UNSUPPORTED', 'Supported WMS operations: GetCapabilities, GetMap')
+    if format.lower() not in {'image/png','image/png8'}: return error_response(400,'WMS_FORMAT_UNSUPPORTED','Only image/png is supported')
+    f=FIELDS.get((layers or '').split(',')[0])
+    if not f: return error_response(404,'LAYER_NOT_FOUND','Unknown WMS layer')
+    try: raw=tuple(float(x) for x in (bbox or '').split(','))
+    except Exception: return error_response(400,'WMS_INVALID_BBOX','bbox must contain four coordinates')
+    if len(raw)!=4: return error_response(400,'WMS_INVALID_BBOX','bbox must contain four coordinates')
+    # WMS 1.3.0 follows CRS axis order. EPSG:4326 is latitude,longitude;
+    # CRS:84 is longitude,latitude and is useful for clients that use web-map order.
+    if crs.upper() == 'EPSG:4326':
+        miny,minx,maxy,maxx=raw
+    elif crs.upper() == 'CRS:84':
+        minx,miny,maxx,maxy=raw
+    else:
+        return error_response(400,'WMS_CRS_UNSUPPORTED','Supported CRS values: EPSG:4326 and CRS:84')
+    return wms_map(f, (minx,miny,maxx,maxy), width, height, depth)
 
 @app.get('/api/health')
 def health(): return {'status':'ok','service':'sih26067-ocean-api','version':app.version,'real_fields':list(FIELDS),'argo_markers':len(ARGO),'sources':{'incois_vam':bool(FIELDS),'incois_currents':CURRENT_FIELD is not None}}
