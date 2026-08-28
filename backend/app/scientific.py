@@ -14,6 +14,16 @@ def _indices(n,lod): return np.arange(n) if lod<=1 else np.arange(0,n,max(1,lod)
 def bounds(v):
     a=v[np.isfinite(v)&(v!=MISSING)]
     return {'min':float(np.min(a)),'max':float(np.max(a))} if a.size else {'min':0.0,'max':1.0}
+def subset_field(f, lat_min=None, lat_max=None, lon_min=None, lon_max=None, depth_min=None, depth_max=None, lat_stride=1, lon_stride=1, depth_stride=1):
+    def idx(a,lo,hi,stride):
+        mask=np.ones(len(a),dtype=bool)
+        if lo is not None: mask &= a >= lo
+        if hi is not None: mask &= a <= hi
+        ids=np.flatnonzero(mask)[::max(1,stride)]
+        return ids if len(ids) else np.arange(len(a))[::max(1,stride)]
+    zi=idx(f.depths,depth_min,depth_max,depth_stride); yi=idx(f.latitudes,lat_min,lat_max,lat_stride); xi=idx(f.longitudes,lon_min,lon_max,lon_stride)
+    return ScalarField(f.variable,f.units,f.depths[zi],f.latitudes[yi],f.longitudes[xi],f.values[np.ix_(zi,yi,xi)],f.valid_time,f.source,f.product,f.dataset_id,f.cf_conventions)
+
 def make_slice(f,depth_index,lod=1):
     depth_index=max(0,min(depth_index,len(f.depths)-1)); yi=_indices(len(f.latitudes),lod); xi=_indices(len(f.longitudes),lod); v=f.values[depth_index][np.ix_(yi,xi)]
     return SliceResponse(variable=f.variable,units=f.units,depth=float(f.depths[depth_index]),shape=[len(yi),len(xi)],values=v.reshape(-1).astype(float).tolist(),latitude=f.latitudes[yi].astype(float).tolist(),longitude=f.longitudes[xi].astype(float).tolist(),missing_value=MISSING,bounds=bounds(v))

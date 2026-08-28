@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from .argo import fetch_argo_profile, fetch_surface_markers
 from .models import *
-from .scientific import make_slice, make_volume, metadata, sample_field
+from .scientific import make_slice, make_volume, metadata, sample_field, subset_field
 from .real_fields import load_incois_fields, load_incois_currents
 from .remote import fetch_field as fetch_remote_field, time_values
 
@@ -63,16 +63,25 @@ def field_metadata(field_id):
     return metadata(f)
 
 @app.get('/api/fields/{field_id}/slice')
-def field_slice(field_id,depth:float=Query(0,ge=0),lod:int=Query(1,ge=1,le=16),time_index:int|None=Query(None,ge=0)):
+def field_slice(field_id,depth:float=Query(0,ge=0),lod:int=Query(1,ge=1,le=16),time_index:int|None=Query(None,ge=0),lat_min:float|None=None,lat_max:float|None=None,lon_min:float|None=None,lon_max:float|None=None):
     f=resolve_field(field_id,time_index)
     if not f:return error_response(404,'FIELD_UNAVAILABLE','Field is unavailable')
+    f=subset_field(f,lat_min,lat_max,lon_min,lon_max)
     i=min(range(len(f.depths)),key=lambda j:abs(float(f.depths[j])-depth)); return make_slice(f,i,lod)
 
 @app.get('/api/fields/{field_id}/volume')
-def field_volume(field_id,lod:int=Query(2,ge=1,le=16),time_index:int|None=Query(None,ge=0)):
+def field_volume(field_id,lod:int=Query(2,ge=1,le=16),time_index:int|None=Query(None,ge=0),lat_min:float|None=None,lat_max:float|None=None,lon_min:float|None=None,lon_max:float|None=None,depth_min:float|None=None,depth_max:float|None=None):
     f=resolve_field(field_id,time_index)
     if not f:return error_response(404,'FIELD_UNAVAILABLE','Field is unavailable')
+    f=subset_field(f,lat_min,lat_max,lon_min,lon_max,depth_min,depth_max)
     return make_volume(f,lod)
+
+@app.get('/api/fields/{field_id}/cube')
+def field_cube(field_id,time_index:int|None=Query(None,ge=0),lat_min:float|None=None,lat_max:float|None=None,lon_min:float|None=None,lon_max:float|None=None,depth_min:float|None=None,depth_max:float|None=None,lat_stride:int=Query(1,ge=1,le=32),lon_stride:int=Query(1,ge=1,le=32),depth_stride:int=Query(1,ge=1,le=16)):
+    f=resolve_field(field_id,time_index)
+    if not f:return error_response(404,'FIELD_UNAVAILABLE','Field is unavailable')
+    f=subset_field(f,lat_min,lat_max,lon_min,lon_max,depth_min,depth_max,lat_stride,lon_stride,depth_stride)
+    return make_volume(f,1)
 
 @app.get('/api/fields/currents/vector', response_model=VectorFieldResponse)
 def current_vectors():
@@ -108,3 +117,11 @@ def comparison(platform,cycle,field_id='temperature'):
         except Exception:model=None
         pts.append({'depth':o.depth,'observed':observed,'model':model,'delta':None if model is None else model-observed,'qc':o.qc})
     return ComparisonResponse(platform=p.platform,cycle=p.cycle,variable=f.variable,units=f.units,observation_timestamp=p.timestamp,model_valid_time=f.valid_time,interpolation='trilinear',points=pts)
+
+
+@app.get('/{full_path:path}', include_in_schema=False)
+def spa_fallback(full_path: str):
+    if full_path.startswith('api/') or full_path.startswith('assets/'):
+        return JSONResponse({'detail':'Not found'}, status_code=404)
+    index = FRONTEND_DIST/'index.html'
+    return FileResponse(index) if index.exists() else JSONResponse({'service':'sih26067-ocean-api'},503)
