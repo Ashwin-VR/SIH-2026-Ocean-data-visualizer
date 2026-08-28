@@ -1,0 +1,63 @@
+=== Argo live CSV probe ===
+time,latitude,longitude,platform_number,cycle_number,pres,temp,psal
+UTC,degrees_north,degrees_east,,,decibar,degree_Celsius,PSU
+2026-01-01T07:58:42Z,-3.42543,49.90202,1902025,336,0.92,29.523,NaN
+2026-01-01T07:58:42Z,-3.42543,49.90202,1902025,336,1.88,29.509,NaN
+2026-01-01T07:58:42Z,-3.42543,49.90202,1902025,336,3.04,29.51,NaN
+2026-01-01T07:58:42Z,-3.42543,49.90202,1902025,336,4.0,29.513,NaN
+2026-01-01T07:58:42Z,-3.42543,49.90202,1902025,336,5.0,29.506,NaN
+2026-01-01T07:58:42Z,-3.42543,49.90202,1902025,336,5.92,29.507,NaN
+2026-01-01T07:58:42Z,-3.42543,49.90202,1902025,336,6.92,29.503,NaN
+2026-01-01T07:58:42Z,-3.42543,49.90202,1902025,336,8.0,29.497,NaN
+2026-01-01T07:58:42Z,-3.42543,49.90202,1902025,336,8.96,29.485,NaN
+2026-01-01T07:58:42Z,-3.42543,49.90202,1902025,336,10.24,29.469,NaN
+2026-01-01T07:58:42Z,-3.42543,49.90202,1902025,336,12.04,29.459,NaN
+2026-01-01T07:58:42Z,-3.42543,49.90202,1902025,336,14.0,29.452,NaN
+2026-01-01T07:58:42Z,-3.42543,49.90202,1902025,336,15.96,29.445,NaN
+2026-01-01T07:58:42Z,-3.42543,49.90202,1902025,336,17.92,29.435,NaN
+2026-01-01T07:58:42Z,-3.42543,49.90202,1902025,336,20.0,29.424,NaN
+2026-01-01T07:58:42Z,-3.42543,49.90202,1902025,336,22.0,29.393,NaN
+2026-01-01T07:58:42Z,-3.42543,49.90202,1902025,336,24.0,29.237,NaN
+2026-01-01T07:58:42Z,-3.42543,49.90202,1902025,336,26.08,28.96,NaN
+
+=== Copernicus product page metadata snippets ===
+="width=device-width, initial-scale=1.0" data-sentry-element="meta" data-sentry-source-file="_app.tsx" data-next-head=""/><script async="" src="https://www.googletagmanager.com/gtag/js?id=G-28RD493Z32">
+eta property="og:type" content="website" data-sentry-element="meta" data-sentry-source-file="001-Head.tsx" data-next-head=""/><meta property="og:title" content="Global Ocean Physics Analysis and Forecas
+t" data-sentry-element="meta" data-sentry-source-file="001-Head.tsx" data-next-head=""/><meta property="og:description" content="The Operational Mercator global oce
+age" content="https://mdl-metadata.s3.waw3-1.cloudferro.com/metadata/thumbnails/GLOBAL_ANALYSISFORECAST_PHY_001_024.jpg" data-next-head=""/><meta name="twitter:site" content="@cmems_eu" data-next-head=""/><meta name="twitter:title" con
+bal Ocean Physics Analysis and Forecast" data-sentry-element="meta" data-sentry-source-file="001-Head.tsx" data-next-head=""/><meta name="twitter:description" content="The Operational Mercator global oc
+age" content="https://mdl-metadata.s3.waw3-1.cloudferro.com/metadata/thumbnails/GLOBAL_ANALYSISFORECAST_PHY_001_024.jpg" data-next-head=""/><meta name="twitter:card" content="summary_large_image" data-sentry-element="meta" data-sentry-
+source-file="001-Head.tsx" data-next-head=""/><meta name="description" content="The Operational Mercator global ocean anal
+l ocean." data-next-head=""/><link rel="alternate" hrefLang="en" href="/product/GLOBAL_ANALYSISFORECAST_PHY_001_024/description" data-next-head=""/><link rel="alternate" hrefLang="es" href="/es/product/GLOBAL_ANALYSISFORECAST_PHY_001_0
+e" content="notranslate"/><link data-next-font="" rel="preconnect" href="/" crossorigin="anonymous"/><link rel="preload" href="/_next/static/css/26239ede3a246b26.css" as="style"/><link rel="preload" hre
+description-afd0199f020012fd.js" defer=""></script><script src="/_next/static/ImvojqXBkYg_mnxHbmYby/_buildManifest.js" defer=""></script><script src="/_next/static/ImvojqXBkYg_mnxHbmYby/_ssgManifest.js"
+ader-item{margin-left:18px}a.wk-top-header-item{color:inherit;border-bottom:1px solid transparent}a.wk-top-header-item:hover{color:inherit;border-bottom:1px solid var(--color-moi-fg)}.top-search.jsx-6f9
+er-radius:0;padding:4px 6px}.btn-search.jsx-6f90faaa93a26c16{margin-left:5px;cursor:pointer;background:transparent;border:none;padding:0}@media screen and (max-width:1250px){.header-top-content.jsx-6f90
+al-padding)}}.log-in-out.jsx-6f90faaa93a26c16,.register.jsx-6f90faaa93a26c16{cursor:pointer}.username.jsx-6f90faaa93a26c16{opacity:.5}.lang.jsx-6f90faaa93a26c16{position:relative;padding:8px 0;cursor:po
+inter}.lang-current.jsx-6f90faaa93a26c16{border-bottom:1px solid transparent}.lang.jsx-6f90faaa93a26c16:hover .lang-current.jsx-6f90faaa93a26c16{border-bottom:1px solid var(--color-
+moi-fg)}.lang-menu.jsx-6f90faaa93a26c16{display:none;position:absolute;z-index:1;top:-webkit-calc(100%);top:-moz-calc(100%);top:calc(100%);right:0;background:white;border:1px solid var(-
+ile-menu-item{display:block;padding:10px var(--modal-padding);border-bottom:1px solid var(--color-moi-fg);color:inherit}.wk-mobile-menu-item:hover{background:var(--color-moi-bg-darker);color:inherit}@me
+){.mobile-menu.jsx-77878c35d1804fc4{display:block}}.wk-mobile-menu-item.lang{cursor:pointer}.mobile-lang-menu.jsx-77878c35d1804fc4{display:none;margin-bottom:-10px;padding:10px 0 0}.wk-mobile-menu-item.
+-padding));padding:10px 0}.mobile-lang-item.jsx-77878c35d1804fc4{border-top:1px solid var(--color-moi-fg-semi-transparent)}</style><style id="__jsx-b050732bd7c4bdad">.header-bottom.jsx-b050732bd7c4bdad{
+18px}a.wk-bottom-header-item{color:inherit;padding-bottom:1px;border-bottom:1px solid transparent}.wk-bottom-header-item:hover{border-bottom:1px solid var(--color-moi-bg)}</style><style id="__jsx-3f8dc6
+fdbfedf97937a5 a{color:var(--color-moi-fg);padding-bottom:1px;border-bottom:1px solid transparent;opacity:.8;-webkit-transition:opacity 300ms;-moz-transition:opacity 300ms;-o-transition:opacity 300ms;tr
+ansition:opacity 300ms}.crumbs.jsx-53fdbfedf97937a5 a:hover{border-bottom:1px solid var(--color-moi-fg);opacity:1}.crumb.disabled.jsx-53fdbfedf97937a5{pointer-events:none;opacity:.5}.crumb-sep.jsx-53f
+8929{display:none}}.nav-buttons.jsx-706d15242c388929{margin-top:15px;border:1px solid var(--color-title-bg)}.sidebar.standalone.jsx-706d15242c388929 .nav-buttons.jsx-706d15242c388929{margin-top:0}.nav-b
+:white}.nav-buttons.jsx-706d15242c388929 .nav-button+.nav-button{border-top:1px solid var(--color-title-bg)}.nav-buttons.jsx-706d15242c388929 .nav-button.active{background-color:var(--color-title-bg)}@m
+ns.jsx-706d15242c388929 .nav-button+.nav-button{border-top:none;border-left:1px solid var(--color-title-bg)}}.nav-button-icon.jsx-706d15242c388929{position:relative;margin-left:-4px;margin-right:8px;col
+jsx-ee77f03e66cae6b0{display:block}}.extra.jsx-ee77f03e66cae6b0{border-left:1px solid var(--color-title-bg);border-right:1px solid var(--color-title-bg);border-bottom:1px solid var(--color-title-bg);bac
+moz-box;display:-ms-flexbox;display:flex;padding:0 14px;margin:9px 0;border:1px solid transparent;color:inherit}.extra-row-icon.jsx-ee77f03e66cae6b0{margin-left:-4px;margin-right:8px;color:var(--color-d
+er{color:var(--color-dim)}}.cm-doi.jsx-ee77f03e66cae6b0{word-break:break-all;cursor:pointer}</style><style id="__jsx-a4522e4324afafaa">.abstract.column.jsx-a4522e4324afafaa{display:grid;grid-template-co
+tle-inner.jsx-e9d7f29726c127a8{padding:10px var(--modal-padding);border-top:1px solid var(--color-subtle-line)}.dataset-title-label.jsx-e9d7f29726c127a8{margin-right:.6em}.content.jsx-e9d7f29726c127a8{m
+eight:normal;font-size:26px}.section-sep.jsx-9b5763a487cb4ba7{border-bottom:1px solid var(--color-moi-fg);padding-top:30px;margin-bottom:25px}@media screen and (max-width:900px){.section-sep.jsx-9b5763a
+en and (max-width:1250px){.section-title.jsx-9b5763a487cb4ba7{margin-top:40px}}.social-links.jsx-9b5763a487cb4ba7{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));grid-gap:0 20px}.s
+
+=== local Python packages ===
+3.12.3 (main, Jun 19 2026, 12:46:00) [GCC 13.3.0]
+xarray False
+zarr False
+netCDF4 False
+copernicusmarine False
+argopy False
+numpy False
+scipy False
