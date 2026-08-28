@@ -9,8 +9,9 @@ export type ComparisonResponse={platform:string;cycle:number;variable:string;uni
 const API_BASE=(import.meta.env.VITE_API_BASE_URL??'').replace(/\/$/,'')
 async function request<T>(path:string):Promise<T>{const r=await fetch(`${API_BASE}${path}`);if(!r.ok){const b=await r.json().catch(()=>({}));throw new Error(b?.error?.message??`Request failed: ${r.status}`)}return r.json()}
 export const getFields=()=>request<FieldCatalogItem[]>('/api/fields')
-export const getVolume=(field:string,lod=1)=>request<VolumeResponse>(`/api/fields/${field}/volume?lod=${lod}`)
-export const getSlice=(field:string,depth:number,lod=1)=>request<SliceResponse>(`/api/fields/${field}/slice?depth=${depth}&lod=${lod}`)
+export const getVolume=(field:string,lod=1,timeIndex?:number)=>request<VolumeResponse>(`/api/fields/${field}/volume?lod=${lod}${timeIndex==null?'':`&time_index=${timeIndex}`}`)
+export const getSlice=(field:string,depth:number,lod=1,timeIndex?:number)=>request<SliceResponse>(`/api/fields/${field}/slice?depth=${depth}&lod=${lod}${timeIndex==null?'':`&time_index=${timeIndex}`}`)
+export const getTimes=(field:string)=>request<string[]>(`/api/fields/${field}/times`)
 export const getObservations=()=>request<ObservationMarker[]>('/api/observations')
 export const getProfile=(platform:string,cycle:number)=>request<ProfileResponse>(`/api/observations/${platform}/${cycle}/profile`)
 export const getComparison=(platform:string,cycle:number,field='salinity')=>request<ComparisonResponse>(`/api/comparisons/profile?platform=${platform}&cycle=${cycle}&field_id=${field}`)

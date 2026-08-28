@@ -1,0 +1,33 @@
+from __future__ import annotations
+from io import BytesIO
+from functools import lru_cache
+import os
+import warnings
+import requests
+import numpy as np
+import xarray as xr
+from .scientific import ScalarField
+
+BASE='https://erddap.incois.gov.in/erddap/griddap/incois_argo_mnt_VAM'
+VERIFY_TLS=os.getenv('INCOIS_VERIFY_TLS','0').lower() in {'1','true','yes'}
+
+def _get(url:str):
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        r=requests.get(url,timeout=30,verify=VERIFY_TLS)
+    r.raise_for_status(); return r.content
+
+@lru_cache(maxsize=1)
+def time_values():
+    ds=xr.open_dataset(BytesIO(_get(f'{BASE}.nc?time')),engine='scipy')
+    return tuple(str(np.datetime_as_string(v,unit='s'))+'Z' for v in ds.time.values)
+
+@lru_cache(maxsize=16)
+def fetch_field(field:str,time_index:int=270):
+    variable='TEMP' if field=='temperature' else 'SAL'
+    url=f'{BASE}.nc?{variable}[{time_index}][0:23][0:59][0:89]'
+    ds=xr.open_dataset(BytesIO(_get(url)),engine='scipy')
+    da=ds[variable].isel(time=0)
+    values=np.asarray(da.values,dtype=np.float32)
+    values=np.where(np.isfinite(values),values,-9999.0)
+    return ScalarField(variable='temperature' if field=='temperature' else 'salinity',units='degC' if field=='temperature' else 'PSU',depths=np.asarray(ds.ZAX.values,dtype=np.float32),latitudes=np.asarray(ds.latitude.values,dtype=np.float32),longitudes=np.asarray(ds.longitude.values,dtype=np.float32),values=values,valid_time=str(np.datetime_as_string(ds.time.values[0],unit='s'))+'Z',source='INCOIS · ARGO VAM · public ERDDAP griddap',product='INCOIS ARGO Monthly data Variational Analysis Methodology',dataset_id='incois_argo_mnt_VAM',cf_conventions=str(ds.attrs.get('Conventions','CF-1.6')))
