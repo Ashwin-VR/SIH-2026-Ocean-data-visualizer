@@ -1,0 +1,17 @@
+[project]
+name = "sih26067-ocean-api"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["fastapi>=0.116", "uvicorn[standard]>=0.35", "pydantic>=2.11", "numpy>=2.2", "httpx>=0.28"]
+
+[project.optional-dependencies]
+science = ["xarray>=2025.6", "scipy>=1.16", "zarr>=3.0", "netcdf4>=1.7", "copernicusmarine>=2.3"]
+test = ["pytest>=8.4", "httpx>=0.28"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+filterwarnings = [
+  "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+  "ignore:Setting the shape on a NumPy array has been deprecated",
+]
