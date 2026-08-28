@@ -22,7 +22,9 @@ def error_response(status,code,message,details=None):
 @app.exception_handler(RequestValidationError)
 async def validation(request,exc): return error_response(422,'VALIDATION_ERROR','Request validation failed',{'errors':exc.errors()})
 
-if FRONTEND_DIST.exists(): app.mount('/assets',StaticFiles(directory=FRONTEND_DIST/'assets'),name='assets')
+if FRONTEND_DIST.exists():
+    app.mount('/assets',StaticFiles(directory=FRONTEND_DIST/'assets'),name='assets')
+    app.mount('/earth',StaticFiles(directory=Path(__file__).resolve().parents[2]/'frontend'/'public'/'earth'),name='earth')
 
 FIELDS=load_incois_fields()
 CURRENT_FIELD=load_incois_currents()
@@ -160,7 +162,7 @@ def comparison(platform,cycle,field_id='temperature'):
 
 @app.get('/{full_path:path}', include_in_schema=False)
 def spa_fallback(full_path: str):
-    if full_path.startswith('api/') or full_path.startswith('assets/'):
+    if full_path.startswith('api/') or full_path.startswith('assets/') or full_path.startswith('earth/'):
         return JSONResponse({'detail':'Not found'}, status_code=404)
     index = FRONTEND_DIST/'index.html'
     return FileResponse(index) if index.exists() else JSONResponse({'service':'sih26067-ocean-api'},503)
