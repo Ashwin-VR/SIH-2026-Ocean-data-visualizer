@@ -14,3 +14,6 @@ data/copernicus/
 frontend/*.tsbuildinfo
 frontend/vite.config.js
 frontend/vite.config.d.ts
+# Large raw operational downloads are not stored in Git. Use the documented remote/subset workflow.
+data/incois/CURRENTS_IO_*.nc
+data/incois/*_raw.nc
