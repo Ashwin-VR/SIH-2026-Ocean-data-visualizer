@@ -6,7 +6,7 @@ import type {FieldCatalogItem,ObservationMarker,SliceResponse,VectorFieldRespons
 import type {CubeMode,Region,View} from '../App'
 import {paletteCss} from '../lib/volume'
 
-type Props={view:View;cubeActive:boolean;cubeMode:CubeMode;isoValue:number;region:Region|null;selectRegion:boolean;field:FieldCatalogItem|null;volume:VolumeResponse|null;slice:SliceResponse|null;currents:VectorFieldResponse|null;observations:ObservationMarker[];selected:ObservationMarker|null;selectedBuoys:ObservationMarker[];opacity:number;exaggeration:number;onSelect:(m:ObservationMarker)=>void;onRegionPick:(lat:number,lon:number)=>void}
+type Props={view:View;cubeActive:boolean;cubeMode:CubeMode;isoValue:number|null;region:Region|null;selectRegion:boolean;field:FieldCatalogItem|null;volume:VolumeResponse|null;slice:SliceResponse|null;currents:VectorFieldResponse|null;observations:ObservationMarker[];selected:ObservationMarker|null;selectedBuoys:ObservationMarker[];opacity:number;exaggeration:number;onSelect:(m:ObservationMarker)=>void;onRegionPick:(lat:number,lon:number)=>void}
 const R=100
 const EARTH_TEXTURE='/earth/earth-blue-marble.jpg',EARTH_BUMP='/earth/earth-topology.png'
 const neon='#d9ff00'
@@ -27,18 +27,112 @@ function cubePoint(lat:number,lon:number,depth:number,region:Region,w:number,h:n
 function makeCubeFrame(region:Region,w:number,h:number,d:number){const group=new THREE.Group();const mat=new THREE.LineBasicMaterial({color:0x697176,transparent:true,opacity:.7});const pts=[new THREE.Vector3(-w/2,h/2,-d/2),new THREE.Vector3(w/2,h/2,-d/2),new THREE.Vector3(w/2,h/2,d/2),new THREE.Vector3(-w/2,h/2,d/2),new THREE.Vector3(-w/2,-h/2,-d/2),new THREE.Vector3(w/2,-h/2,-d/2),new THREE.Vector3(w/2,-h/2,d/2),new THREE.Vector3(-w/2,-h/2,d/2)];const edges=[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];for(const [a,b] of edges){const g=new THREE.BufferGeometry().setFromPoints([pts[a],pts[b]]);group.add(new THREE.Line(g,mat))}group.userData.region=region;return group}
 function makeDepthTicks(depths:number[],h:number){const group=new THREE.Group(),max=depths.at(-1)??1,mat=new THREE.LineBasicMaterial({color:0x6e777b,transparent:true,opacity:.65});for(const dep of depths){const y=h/2-(dep/max)*h;const g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-.18,y,0),new THREE.Vector3(.18,y,0)]);group.add(new THREE.Line(g,mat))}return group}
 function labelSprite(text:string){const c=document.createElement('canvas');c.width=512;c.height=64;const x=c.getContext('2d')!;x.clearRect(0,0,c.width,c.height);x.fillStyle='#c8d0d3';x.font='28px monospace';x.fillText(text,4,38);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;const m=new THREE.SpriteMaterial({map:t,transparent:true,depthTest:false});const s=new THREE.Sprite(m);s.scale.set(3.2,.4,1);return s}
-function makeVolumePlanes(v:VolumeResponse,w:number,h:number,d:number,opacity:number){const[nz,ny,nx]=v.shape,group=new THREE.Group(),maxDepth=v.depth.at(-1)??1;for(let z=0;z<nz;z++){const geom=new THREE.BufferGeometry(),positions:number[]=[],colors:number[]=[];for(let y=0;y<ny;y++)for(let x=0;x<nx;x++){const px=(x/(nx-1)-.5)*w,pz=(.5-y/(ny-1))*d,py=h/2-(v.depth[z]/maxDepth)*h;positions.push(px,py,pz);const value=v.values[z*ny*nx+y*nx+x];const c=Number.isFinite(value)&&value!==v.missing_value?cubeColor(value,v.bounds.min,v.bounds.max):new THREE.Color(0,0,0);colors.push(c.r,c.g,c.b)}const indices:number[]=[];for(let y=0;y<ny-1;y++)for(let x=0;x<nx-1;x++){const i=y*nx+x;indices.push(i,i+1,i+nx,i+1,i+nx+1,i+nx)}geom.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geom.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));geom.setIndex(indices);const mat=new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,opacity:opacity*.72,side:THREE.DoubleSide,depthWrite:false});const mesh=new THREE.Mesh(geom,mat);mesh.renderOrder=10+z;group.add(mesh)}return group}
-function makeIsoPoints(v:VolumeResponse,iso:number,w:number,h:number,d:number){const[nz,ny,nx]=v.shape,maxDepth=v.depth.at(-1)??1,pos:number[]=[],minDistance=Math.max((v.bounds.max-v.bounds.min)/18,.01);for(let z=0;z<nz;z++)for(let y=0;y<ny;y++)for(let x=0;x<nx;x++){const value=v.values[z*ny*nx+y*nx+x];if(!Number.isFinite(value)||value===v.missing_value||Math.abs(value-iso)>minDistance)continue;pos.push((x/(nx-1)-.5)*w,h/2-(v.depth[z]/maxDepth)*h,(.5-y/(ny-1))*d)}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));const m=new THREE.PointsMaterial({color:0xd9ff00,size:.09,sizeAttenuation:true,transparent:true,opacity:.95});const p=new THREE.Points(g,m);p.renderOrder=50;return p}
+function makeVolumePlanes(v:VolumeResponse,w:number,h:number,d:number,opacity:number){
+ const[nz,ny,nx]=v.shape,group=new THREE.Group(),maxDepth=v.depth.at(-1)??1;
+ for(let z=0;z<nz;z++){
+  const geom=new THREE.BufferGeometry(),positions:number[]=[],colors:number[]=[];
+  for(let y=0;y<ny;y++)for(let x=0;x<nx;x++){
+   const px=(x/Math.max(1,nx-1)-.5)*w,pz=(.5-y/Math.max(1,ny-1))*d,py=h/2-(v.depth[z]/maxDepth)*h;
+   positions.push(px,py,pz);
+   const value=v.values[z*ny*nx+y*nx+x];
+   const c=Number.isFinite(value)&&value!==v.missing_value?cubeColor(value,v.bounds.min,v.bounds.max):new THREE.Color(0,0,0);
+   colors.push(c.r,c.g,c.b);
+  }
+  const indices:number[]=[];
+  for(let y=0;y<ny-1;y++)for(let x=0;x<nx-1;x++){const i=y*nx+x;indices.push(i,i+1,i+nx,i+1,i+nx+1,i+nx)}
+  geom.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  geom.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
+  geom.setIndex(indices);
+  const mesh=new THREE.Mesh(geom,new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,opacity:opacity*.28,side:THREE.DoubleSide,depthWrite:false,depthTest:true}));
+  mesh.renderOrder=10+z;
+  group.add(mesh);
+  const edge=new THREE.LineSegments(new THREE.EdgesGeometry(geom,35),new THREE.LineBasicMaterial({color:0x9ca7ab,transparent:true,opacity:.28,depthTest:false}));
+  edge.renderOrder=80+z;
+  group.add(edge);
+ }
+ return group;
+}
+function makeIsoPoints(v:VolumeResponse,iso:number|null,w:number,h:number,d:number){
+ if(iso===null)return null;
+ const[nz,ny,nx]=v.shape,maxDepth=v.depth.at(-1)??1,pos:number[]=[],minDistance=Math.max((v.bounds.max-v.bounds.min)/24,.01);
+ for(let z=0;z<nz;z++)for(let y=0;y<ny;y++)for(let x=0;x<nx;x++){
+  const value=v.values[z*ny*nx+y*nx+x];
+  if(!Number.isFinite(value)||value===v.missing_value||Math.abs(value-iso)>minDistance)continue;
+  pos.push((x/Math.max(1,nx-1)-.5)*w,h/2-(v.depth[z]/maxDepth)*h,(.5-y/Math.max(1,ny-1))*d);
+ }
+ const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+ const group=new THREE.Group();
+ const halo=new THREE.Points(g.clone(),new THREE.PointsMaterial({color:0xffffff,size:.16,sizeAttenuation:true,transparent:true,opacity:.95,depthTest:false}));
+ const inner=new THREE.Points(g,new THREE.PointsMaterial({color:colorFor(iso,v.bounds.min,v.bounds.max),size:.105,sizeAttenuation:true,transparent:true,opacity:1,depthTest:false}));
+ halo.renderOrder=120;inner.renderOrder=121;group.add(halo,inner);
+ return group;
+}
 function makeCubeCurrents(v:VectorFieldResponse,w:number,h:number,d:number,region:Region){const group=new THREE.Group(),z=h/2+.06,lat0=region.latMin,lat1=region.latMax,lon0=region.lonMin,lon1=region.lonMax;const lines=makeStreamlines(v);for(const path of lines){const pts=path.points.map(([lat,lon])=>new THREE.Vector3(((lon-lon0)/(lon1-lon0||1)-.5)*w,z,(.5-(lat-lat0)/(lat1-lat0||1))*d));if(pts.length<2)continue;const g=new THREE.BufferGeometry().setFromPoints(pts);group.add(new THREE.Line(g,new THREE.LineBasicMaterial({color:0xf5f7f7,transparent:true,opacity:.78})));}return group}
-function makeBuoys(obs:ObservationMarker[],selected:ObservationMarker[],region:Region,w:number,d:number){const group=new THREE.Group();for(const m of obs){if(m.latitude<region.latMin||m.latitude>region.latMax||m.longitude<region.lonMin||m.longitude>region.lonMax)continue;const x=((m.longitude-region.lonMin)/(region.lonMax-region.lonMin||1)-.5)*w,z=(.5-(m.latitude-region.latMin)/(region.latMax-region.latMin||1))*d,isSel=selected.some(s=>s.platform===m.platform&&s.cycle===m.cycle),s=new THREE.Mesh(new THREE.SphereGeometry(isSel?.12:.07,12,8),new THREE.MeshBasicMaterial({color:isSel?neon:0xffffff}));s.position.set(x,d*.0+0.03,z);s.userData.marker=m;group.add(s)}return group}
+
 
 export function OceanScene(p:Props){
- const ref=useRef<HTMLDivElement>(null),globeRef=useRef<any>(null),cubeRef=useRef<{renderer:THREE.WebGLRenderer;scene:THREE.Scene;camera:THREE.PerspectiveCamera;controls:OrbitControls;objects:THREE.Object3D[];buoys:THREE.Group|null;resize:()=>void;cleanup:()=>void}|null>(null),selectRef=useRef(p.onSelect),regionRef=useRef(p.onRegionPick),selectModeRef=useRef(p.selectRegion)
+ const ref=useRef<HTMLDivElement>(null),globeRef=useRef<any>(null),cubeRef=useRef<{renderer:THREE.WebGLRenderer;scene:THREE.Scene;camera:THREE.PerspectiveCamera;controls:OrbitControls;objects:THREE.Object3D[];buoys:THREE.Group|null;resize:()=>void;cleanup:()=>void}|null>(null),cubeCameraStateRef=useRef<{position:[number,number,number];target:[number,number,number]}|null>(null),selectRef=useRef(p.onSelect),regionRef=useRef(p.onRegionPick),selectModeRef=useRef(p.selectRegion)
  selectRef.current=p.onSelect;regionRef.current=p.onRegionPick;selectModeRef.current=p.selectRegion
  useEffect(()=>{if(!ref.current||p.cubeActive)return;const host=ref.current,g=new Globe(host,{animateIn:false,waitForGlobeReady:true}).backgroundColor('#000000').globeImageUrl(EARTH_TEXTURE).bumpImageUrl(EARTH_BUMP).showAtmosphere(true).atmosphereColor('#8ddff0').atmosphereAltitude(.045).showGraticules(true).pointOfView({lat:18,lng:78,altitude:1.8});const renderer=g.renderer();renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;g.controls().enableDamping=true;g.controls().dampingFactor=.08;g.controls().minDistance=118;g.controls().maxDistance=500;gRefSetup(g,host);globeRef.current=g;return()=>{g._destructor();globeRef.current=null}},[])
  useEffect(()=>{const g=globeRef.current;if(!g||p.cubeActive)return;g.pointsData(p.observations).pointLat('latitude').pointLng('longitude').pointColor((d:any)=>p.selectedBuoys.some(s=>s.platform===d.platform&&s.cycle===d.cycle)||p.selected?.platform===d.platform?neon:'#f3f6f7').pointAltitude(.02).pointRadius((d:any)=>p.selectedBuoys.some(s=>s.platform===d.platform&&s.cycle===d.cycle)||p.selected?.platform===d.platform?.85:.5).pointResolution(12).pointLabel((d:any)=>`${d.platform} · cycle ${d.cycle}`).onPointClick((d:any)=>selectModeRef.current?selectRef.current(d):selectRef.current(d)).onGlobeClick((lat:number,lng:number)=>{if(selectModeRef.current)regionRef.current(lat,lng)})},[p.observations,p.selected,p.selectedBuoys])
  useEffect(()=>{const g=globeRef.current;if(!g||p.cubeActive)return;const analytical=p.view==='slice';const gm=g.globeMaterial() as any;gm.transparent=analytical;gm.opacity=analytical?.12:1;gm.depthWrite=!analytical;gm.needsUpdate=true;g.customLayerData([]);if(p.slice&&p.view==='globe')g.customLayerData([makeSurface(p.slice,p.opacity)]).customThreeObject((d:any)=>d);if(p.slice&&p.view==='slice')g.customLayerData([makeDepthShell(p.slice,p.opacity,p.slice.depth)]).customThreeObject((d:any)=>d);if(p.view==='currents'&&p.currents){const paths=makeStreamlines(p.currents);g.pathsData(paths).pathPoints('points').pathPointLat((q:any)=>q[0]).pathPointLng((q:any)=>q[1]).pathColor(()=>`rgba(255,255,255,.86)`).pathStroke(1.1).pathDashLength(.5).pathDashGap(.22).pathDashAnimateTime(1400)}else g.pathsData([])},[p.view,p.slice,p.currents,p.opacity])
- useEffect(()=>{if(!ref.current||!p.cubeActive||!p.region||!p.volume)return;const host=ref.current,renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:false});renderer.setPixelRatio(Math.min(2,window.devicePixelRatio));renderer.setSize(host.clientWidth,host.clientHeight);renderer.setClearColor(0x000000,1);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;host.replaceChildren(renderer.domElement);const scene=new THREE.Scene();const camera=new THREE.PerspectiveCamera(42,host.clientWidth/Math.max(1,host.clientHeight),.01,1000);camera.position.set(8,7,11);const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.dampingFactor=.075;controls.minDistance=7;controls.maxDistance=28;controls.target.set(0,0,0);const objects:THREE.Object3D[]=[];const v=p.volume,w=10,h=6.5,d=10*Math.min(1.35,Math.max(.55,(p.region.latMax-p.region.latMin)/(p.region.lonMax-p.region.lonMin||1)*1.3));const frame=makeCubeFrame(p.region,w,h,d);scene.add(frame);objects.push(frame);const grid=new THREE.GridHelper(Math.max(w,d)*1.35,18,0x3b4245,0x1d2224);grid.position.y=-h/2-.01;scene.add(grid);objects.push(grid);const planes=makeVolumePlanes(v,w,h,d,.72);scene.add(planes);objects.push(planes);if(p.cubeMode==='volume'){const iso=makeIsoPoints(v,p.isoValue,w,h,d);scene.add(iso);objects.push(iso)}else if(p.currents){const cg=makeCubeCurrents(p.currents,w,h,d,p.region);scene.add(cg);objects.push(cg)}const buoyGroup=makeBuoys(p.observations,p.selectedBuoys,p.region,w,d);scene.add(buoyGroup);objects.push(buoyGroup);const top=labelSprite(`LAT ${p.region.latMin.toFixed(1)}°–${p.region.latMax.toFixed(1)}°`);top.position.set(-w/2,h/2+.35,-d/2);scene.add(top);objects.push(top);const side=labelSprite(`LON ${p.region.lonMin.toFixed(1)}°–${p.region.lonMax.toFixed(1)}°`);side.position.set(w/2+.5,h/2+.35,d/2);scene.add(side);objects.push(side);const dep=labelSprite(`DEPTH 0 → ${(v.depth.at(-1)??0).toFixed(0)} m`);dep.position.set(-w/2-.7,0,d/2);dep.scale.set(2.8,.35,1);scene.add(dep);objects.push(dep);const depthTicks=makeDepthTicks(v.depth,h);depthTicks.position.x=-w/2-.3;scene.add(depthTicks);objects.push(depthTicks);const light=new THREE.AmbientLight(0xffffff,.7);scene.add(light);const ro=new ResizeObserver(()=>{renderer.setSize(host.clientWidth,host.clientHeight);camera.aspect=host.clientWidth/Math.max(1,host.clientHeight);camera.updateProjectionMatrix()});ro.observe(host);let raf=0;const animate=()=>{raf=requestAnimationFrame(animate);controls.update();renderer.render(scene,camera)};animate();const resize=()=>{renderer.setSize(host.clientWidth,host.clientHeight);camera.aspect=host.clientWidth/Math.max(1,host.clientHeight);camera.updateProjectionMatrix()};cubeRef.current={renderer,scene,camera,controls,objects,buoys:buoyGroup,resize,cleanup:()=>{cancelAnimationFrame(raf);ro.disconnect();controls.dispose();objects.forEach(disposeObject);renderer.dispose()}};return()=>{cubeRef.current?.cleanup();cubeRef.current=null}},[p.cubeActive,p.region,p.volume,p.cubeMode,p.isoValue,p.currents,p.selectedBuoys,p.observations])
+ useEffect(()=>{
+  if(!ref.current||!p.cubeActive||!p.region||!p.volume)return;
+  const host=ref.current,previous=cubeRef.current;
+  if(previous){
+   previous.cleanup();
+   cubeRef.current=null;
+  }
+  const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:false});
+  renderer.setPixelRatio(Math.min(2,window.devicePixelRatio));
+  renderer.setSize(host.clientWidth,host.clientHeight);
+  renderer.setClearColor(0x000000,1);
+  renderer.outputColorSpace=THREE.SRGBColorSpace;
+  renderer.toneMapping=THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure=1.08;
+  host.replaceChildren(renderer.domElement);
+  const scene=new THREE.Scene();
+  const camera=new THREE.PerspectiveCamera(42,host.clientWidth/Math.max(1,host.clientHeight),.01,1000);
+  camera.position.set(8,7,11);
+  const controls=new OrbitControls(camera,renderer.domElement);
+  controls.enableDamping=true;
+  controls.dampingFactor=.075;
+  controls.minDistance=7;
+  controls.maxDistance=28;
+  controls.target.set(0,0,0);
+  const saved=cubeCameraStateRef.current;
+  if(saved){camera.position.set(...saved.position);controls.target.set(...saved.target);controls.update()}
+  const objects:THREE.Object3D[]=[];
+  const v=p.volume,w=10,h=6.5,d=10*Math.min(1.35,Math.max(.7,(p.region.latMax-p.region.latMin)/(p.region.lonMax-p.region.lonMin||1)*1.3));
+  const frame=makeCubeFrame(p.region,w,h,d);scene.add(frame);objects.push(frame);
+  const grid=new THREE.GridHelper(Math.max(w,d)*1.35,18,0x596166,0x252a2d);grid.position.y=-h/2-.01;scene.add(grid);objects.push(grid);
+  const planes=makeVolumePlanes(v,w,h,d,.72);scene.add(planes);objects.push(planes);
+  if(p.cubeMode==='currents'&&p.currents){const cg=makeCubeCurrents(p.currents,w,h,d,p.region);scene.add(cg);objects.push(cg)}
+  const top=labelSprite(`LAT ${p.region.latMin.toFixed(1)}°–${p.region.latMax.toFixed(1)}°`);top.position.set(-w/2,h/2+.35,-d/2);scene.add(top);objects.push(top);
+  const side=labelSprite(`LON ${p.region.lonMin.toFixed(1)}°–${p.region.lonMax.toFixed(1)}°`);side.position.set(w/2+.5,h/2+.35,d/2);scene.add(side);objects.push(side);
+  const dep=labelSprite(`DEPTH 0 → ${(v.depth.at(-1)??0).toFixed(0)} m`);dep.position.set(-w/2-.9,0,d/2);dep.scale.set(2.8,.35,1);scene.add(dep);objects.push(dep);
+  const depthTicks=makeDepthTicks(v.depth,h);depthTicks.position.x=-w/2-.35;scene.add(depthTicks);objects.push(depthTicks);
+  for(const depValue of v.depth.filter((_,i)=>i===0||i===v.depth.length-1||i%Math.max(1,Math.floor(v.depth.length/6))===0)){const label=labelSprite(`${depValue.toFixed(0)} m`);label.scale.set(1.45,.25,1);label.position.set(-w/2-1.15,h/2-(depValue/(v.depth.at(-1)??1))*h,-d/2);scene.add(label);objects.push(label)}
+  const light=new THREE.AmbientLight(0xffffff,.7);scene.add(light);
+  const ro=new ResizeObserver(()=>{renderer.setSize(host.clientWidth,host.clientHeight);camera.aspect=host.clientWidth/Math.max(1,host.clientHeight);camera.updateProjectionMatrix()});ro.observe(host);
+  let raf=0;const animate=()=>{raf=requestAnimationFrame(animate);controls.update();renderer.render(scene,camera)};animate();
+  const resize=()=>{renderer.setSize(host.clientWidth,host.clientHeight);camera.aspect=host.clientWidth/Math.max(1,host.clientHeight);camera.updateProjectionMatrix()};
+  const cleanup=()=>{cubeCameraStateRef.current={position:[camera.position.x,camera.position.y,camera.position.z],target:[controls.target.x,controls.target.y,controls.target.z]};cancelAnimationFrame(raf);ro.disconnect();controls.dispose();objects.forEach(disposeObject);renderer.dispose();if(cubeRef.current?.camera===camera)cubeRef.current=null};
+  cubeRef.current={renderer,scene,camera,controls,objects,buoys:null,resize,cleanup};
+  return cleanup;
+ },[p.cubeActive,p.region,p.volume,p.cubeMode,p.currents]);
+
+ useEffect(()=>{
+  if(!p.cubeActive||!cubeRef.current||!cubeRef.current.scene||!p.volume)return;
+  const scene=cubeRef.current.scene;
+  const previous=scene.getObjectByName('isovalue-highlight');
+  if(previous){scene.remove(previous);disposeObject(previous)}
+  const width=10,height=6.5,latSpan=(p.region?.latMax??1)-(p.region?.latMin??0),lonSpan=(p.region?.lonMax??1)-(p.region?.lonMin??0),depth=10*Math.min(1.35,Math.max(.7,latSpan/(lonSpan||1)*1.3));
+  if(p.cubeMode!=='volume')return;
+  const iso=makeIsoPoints(p.volume,p.isoValue,width,height,depth);
+  if(iso){iso.name='isovalue-highlight';scene.add(iso)}
+ },[p.isoValue,p.cubeActive,p.volume,p.region]);
+
  useEffect(()=>{if(!p.cubeActive&&p.selectRegion&&ref.current){let box=ref.current.querySelector('.roi-cursor') as HTMLDivElement|null;if(!box){box=document.createElement('div');box.className='roi-cursor';box.textContent='ROI';ref.current.appendChild(box)}const move=(e:MouseEvent)=>{const r=ref.current!.getBoundingClientRect();box!.style.left=`${e.clientX-r.left-42}px`;box!.style.top=`${e.clientY-r.top-28}px`};ref.current.addEventListener('mousemove',move);return()=>ref.current?.removeEventListener('mousemove',move)}},[p.cubeActive,p.selectRegion])
  return <div ref={ref} className={`ocean-scene ${p.cubeActive?'cube-scene':''}`} aria-label={p.cubeActive?'Interactive regional ocean data cube':'Interactive geographic ocean analysis globe'}/>
 }
