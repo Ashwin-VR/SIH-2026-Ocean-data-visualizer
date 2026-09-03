@@ -7,7 +7,20 @@ export type ProfileResponse={platform:string;cycle:number;sensor:string;timestam
 export type ComparisonPoint={depth:number;observed:number|null;model:number|null;delta:number|null;qc:string|null}
 export type ComparisonResponse={platform:string;cycle:number;variable:string;units:string;observation_timestamp:string;model_valid_time:string;interpolation:string;points:ComparisonPoint[]}
 const API_BASE=(import.meta.env.VITE_API_BASE_URL??'').replace(/\/$/,'')
-async function request<T>(path:string):Promise<T>{const r=await fetch(`${API_BASE}${path}`);if(!r.ok){const b=await r.json().catch(()=>({}));throw new Error(b?.error?.message??`Request failed: ${r.status}`)}return r.json()}
+const cache=new Map<string,unknown>()
+const pending=new Map<string,Promise<unknown>>()
+let cacheHits=0
+export const getApiCacheHits=()=>cacheHits
+export const clearApiCache=()=>{cache.clear();pending.clear();cacheHits=0}
+async function request<T>(path:string):Promise<T>{
+  const key=`${API_BASE}${path}`
+  if(cache.has(key)){cacheHits++;return cache.get(key) as T}
+  const active=pending.get(key)
+  if(active)return active as Promise<T>
+  const task=(async()=>{const r=await fetch(key);if(!r.ok){const b=await r.json().catch(()=>({}));throw new Error(b?.error?.message??`Request failed: ${r.status}`)}const data=await r.json() as T;cache.set(key,data);return data})()
+  pending.set(key,task)
+  try{return await task}finally{pending.delete(key)}
+}
 export const getFields=()=>request<FieldCatalogItem[]>('/api/fields')
 export const getVolume=(field:string,lod=1,timeIndex?:number)=>request<VolumeResponse>(`/api/fields/${field}/volume?lod=${lod}${timeIndex==null?'':`&time_index=${timeIndex}`}`)
 export const getSlice=(field:string,depth:number,lod=1,timeIndex?:number)=>request<SliceResponse>(`/api/fields/${field}/slice?depth=${depth}&lod=${lod}${timeIndex==null?'':`&time_index=${timeIndex}`}`)

@@ -52,7 +52,7 @@ def fetch_argo_profile(platform: str, cycle: int, timeout=20):
 
 def fetch_surface_markers(timeout=30):
     cols='time,latitude,longitude,platform_number,cycle_number,pres,temp,psal'
-    q=f'{cols}&latitude>=-15&latitude<=25&longitude>=40&longitude<=110&time>=2026-07-01T00:00:00Z&pres>=0&pres<=2'
+    q=f'{cols}&latitude>=-40&latitude<=40&longitude>=20&longitude<=140&time>=2025-01-01T00:00:00Z&pres=0'
     r=httpx.get('https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats.csv?'+q,timeout=timeout); r.raise_for_status()
     profiles=parse_argo_csv(r.text)
     latest={}
