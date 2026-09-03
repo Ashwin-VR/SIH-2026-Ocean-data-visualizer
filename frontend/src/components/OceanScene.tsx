@@ -4,7 +4,7 @@ import Globe from 'globe.gl'
 import type {FieldCatalogItem,ObservationMarker,SliceResponse,VectorFieldResponse,VolumeResponse} from '../lib/api'
 import {normalizeScalarRange,paletteCss} from '../lib/volume'
 
-type View='globe'|'slice'|'volume'|'iso'
+type View='globe'|'slice'|'volume'|'iso'|'currents'
 type Props={view:View;field:FieldCatalogItem|null;volume:VolumeResponse|null;slice:SliceResponse|null;currents:VectorFieldResponse|null;observations:ObservationMarker[];selected:ObservationMarker|null;opacity:number;exaggeration:number;onSelect:(m:ObservationMarker)=>void}
 const R=100
 const EARTH_TEXTURE='/earth/earth-blue-marble.jpg', EARTH_BUMP='/earth/earth-topology.png', EARTH_NIGHT='/earth/earth-night.jpg'
