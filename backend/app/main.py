@@ -9,7 +9,7 @@ from .argo import fetch_argo_profile, fetch_surface_markers
 from .models import *
 from .scientific import make_slice, make_volume, metadata, sample_field, subset_field
 from .real_fields import load_incois_fields, load_incois_currents
-from .remote import fetch_field as fetch_remote_field, fetch_slice as fetch_remote_slice, time_values, REMOTE_DEPTHS
+from .remote import fetch_field as fetch_remote_field, fetch_slice as fetch_remote_slice, fetch_cube as fetch_remote_cube, time_values, REMOTE_DEPTHS
 from .ogc import wcs_capabilities, describe_coverage, coverage_netcdf, wms_capabilities, wms_map
 
 app=FastAPI(title='SIH26067 Ocean Analysis API',version='0.3.0')
@@ -116,6 +116,9 @@ def field_slice(field_id,depth:float=Query(0,ge=0),lod:int=Query(1,ge=1,le=16),t
 
 @app.get('/api/fields/{field_id}/volume')
 def field_volume(field_id,lod:int=Query(2,ge=1,le=16),time_index:int|None=Query(None,ge=0),lat_min:float|None=None,lat_max:float|None=None,lon_min:float|None=None,lon_max:float|None=None,depth_min:float|None=None,depth_max:float|None=None):
+    if time_index is not None and field_id in {'temperature','salinity'} and lat_min is not None and lat_max is not None and lon_min is not None and lon_max is not None and depth_min is None and depth_max is None:
+        try:return fetch_remote_cube(field_id,time_index,lat_min,lat_max,lon_min,lon_max,max(1,lod),max(1,lod),max(1,lod))
+        except Exception as e:return error_response(502,'REMOTE_DATA_UNAVAILABLE','Unable to retrieve the selected regional data cube',{'source':'INCOIS ERDDAP','reason':str(e)})
     f=resolve_field(field_id,time_index)
     if not f:return error_response(404,'FIELD_UNAVAILABLE','Field is unavailable')
     f=subset_field(f,lat_min,lat_max,lon_min,lon_max,depth_min,depth_max)
@@ -123,6 +126,9 @@ def field_volume(field_id,lod:int=Query(2,ge=1,le=16),time_index:int|None=Query(
 
 @app.get('/api/fields/{field_id}/cube')
 def field_cube(field_id,time_index:int|None=Query(None,ge=0),lat_min:float|None=None,lat_max:float|None=None,lon_min:float|None=None,lon_max:float|None=None,depth_min:float|None=None,depth_max:float|None=None,lat_stride:int=Query(1,ge=1,le=32),lon_stride:int=Query(1,ge=1,le=32),depth_stride:int=Query(1,ge=1,le=16)):
+    if time_index is not None and field_id in {'temperature','salinity'} and None not in (lat_min,lat_max,lon_min,lon_max):
+        try:return fetch_remote_cube(field_id,time_index,lat_min,lat_max,lon_min,lon_max,depth_stride,lat_stride,lon_stride)
+        except Exception as e:return error_response(502,'REMOTE_DATA_UNAVAILABLE','Unable to retrieve the selected regional data cube',{'source':'INCOIS ERDDAP','reason':str(e)})
     f=resolve_field(field_id,time_index)
     if not f:return error_response(404,'FIELD_UNAVAILABLE','Field is unavailable')
     f=subset_field(f,lat_min,lat_max,lon_min,lon_max,depth_min,depth_max,lat_stride,lon_stride,depth_stride)

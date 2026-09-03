@@ -48,6 +48,27 @@ def fetch_slice(field:str,time_index:int,depth_index:int,lod:int=1):
         'bounds':{'min':float(np.min(values[values!=-9999.0])),'max':float(np.max(values[values!=-9999.0]))} if np.any(values!=-9999.0) else {'min':0.0,'max':1.0},
     }
 
+
+@lru_cache(maxsize=64)
+def fetch_cube(field:str,time_index:int,lat_min:float,lat_max:float,lon_min:float,lon_max:float,depth_stride:int=1,lat_stride:int=1,lon_stride:int=1):
+    variable='TEMP' if field=='temperature' else 'SAL'
+    # The INCOIS VAM grid is 1 degree in latitude/longitude over the published regional domain.
+    # Convert geographic bounds to nearest grid indices, then request only the selected ROI.
+    lat0=max(-29.5,min(29.5,round(lat_min)))
+    lat1=max(-29.5,min(29.5,round(lat_max)))
+    lon0=max(30.5,min(119.5,round(lon_min)))
+    lon1=max(30.5,min(119.5,round(lon_max)))
+    if lat1<lat0: lat0,lat1=lat1,lat0
+    if lon1<lon0: lon0,lon1=lon1,lon0
+    y0=int(round(lat0+29.5)); y1=int(round(lat1+29.5))
+    x0=int(round(lon0-30.5)); x1=int(round(lon1-30.5))
+    ds_i=max(1,int(depth_stride)); ys=max(1,int(lat_stride)); xs=max(1,int(lon_stride))
+    url=f'{BASE}.nc?{variable}[{time_index}][0:{ds_i}:23][{y0}:{ys}:{y1}][{x0}:{xs}:{x1}]'
+    ds=xr.open_dataset(BytesIO(_get(url)),engine='scipy'); da=ds[variable].isel(time=0)
+    values=np.asarray(da.values,dtype=np.float32); values=np.where(np.isfinite(values),values,-9999.0)
+    valid=values[values!=-9999.0]
+    return {'variable':'temperature' if field=='temperature' else 'salinity','units':'degC' if field=='temperature' else 'PSU','shape':[values.shape[0],values.shape[1],values.shape[2]],'values':values.reshape(-1).astype(float).tolist(),'latitude':np.asarray(ds.latitude.values,dtype=float).tolist(),'longitude':np.asarray(ds.longitude.values,dtype=float).tolist(),'depth':np.asarray(ds.ZAX.values,dtype=float).tolist(),'missing_value':-9999.0,'bounds':{'min':float(valid.min()) if valid.size else 0.0,'max':float(valid.max()) if valid.size else 1.0},'source':'INCOIS · ARGO VAM · public ERDDAP griddap','valid_time':str(np.datetime_as_string(ds.time.values[0],unit='s'))+'Z'}
+
 @lru_cache(maxsize=16)
 def fetch_field(field:str,time_index:int=270):
     variable='TEMP' if field=='temperature' else 'SAL'
