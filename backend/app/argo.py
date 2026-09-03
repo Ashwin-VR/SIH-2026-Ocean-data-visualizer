@@ -2,6 +2,7 @@
 from __future__ import annotations
 import csv, io
 from dataclasses import dataclass
+from functools import lru_cache
 from math import isfinite
 from urllib.parse import quote
 import httpx
@@ -42,6 +43,7 @@ def parse_argo_csv(text: str) -> list[ArgoProfile]:
             out.append(ArgoProfile(platform,cycle,first.get('time',''),float(first['latitude']),float(first['longitude']),pts))
     return out
 
+@lru_cache(maxsize=256)
 def fetch_argo_profile(platform: str, cycle: int, timeout=20):
     cols='time,latitude,longitude,platform_number,cycle_number,pres,temp,psal'
     q=f'{cols}&platform_number=%22{quote(platform)}%22&cycle_number={cycle}'
@@ -57,7 +59,7 @@ def fetch_surface_markers(timeout=30):
     profiles=parse_argo_csv(r.text)
     latest={}
     for p in profiles: latest[p.platform]=p
-    return sorted(latest.values(),key=lambda p:p.timestamp,reverse=True)[:120]
+    return sorted(latest.values(),key=lambda p:p.timestamp,reverse=True)
 
 
 def fixture_profiles():

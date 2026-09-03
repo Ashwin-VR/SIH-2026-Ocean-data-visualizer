@@ -9,7 +9,7 @@ from .argo import fetch_argo_profile, fetch_surface_markers
 from .models import *
 from .scientific import make_slice, make_volume, metadata, sample_field, subset_field
 from .real_fields import load_incois_fields, load_incois_currents
-from .remote import fetch_field as fetch_remote_field, time_values
+from .remote import fetch_field as fetch_remote_field, fetch_slice as fetch_remote_slice, time_values, REMOTE_DEPTHS
 from .ogc import wcs_capabilities, describe_coverage, coverage_netcdf, wms_capabilities, wms_map
 
 app=FastAPI(title='SIH26067 Ocean Analysis API',version='0.3.0')
@@ -105,6 +105,10 @@ def field_metadata(field_id):
 
 @app.get('/api/fields/{field_id}/slice')
 def field_slice(field_id,depth:float=Query(0,ge=0),lod:int=Query(1,ge=1,le=16),time_index:int|None=Query(None,ge=0),lat_min:float|None=None,lat_max:float|None=None,lon_min:float|None=None,lon_max:float|None=None):
+    if time_index is not None and field_id in {'temperature','salinity'} and lat_min is None and lat_max is None and lon_min is None and lon_max is None:
+        i=min(range(len(REMOTE_DEPTHS)),key=lambda j:abs(REMOTE_DEPTHS[j]-depth))
+        try:return fetch_remote_slice(field_id,time_index,i,lod)
+        except Exception as e:return error_response(502,'REMOTE_DATA_UNAVAILABLE','Unable to retrieve the selected ocean field slice',{'source':'INCOIS ERDDAP','reason':str(e)})
     f=resolve_field(field_id,time_index)
     if not f:return error_response(404,'FIELD_UNAVAILABLE','Field is unavailable')
     f=subset_field(f,lat_min,lat_max,lon_min,lon_max)
@@ -140,12 +144,12 @@ def field_point(field_id,lat:float=Query(...,ge=-90,le=90),lon:float=Query(...,g
 def observations(): return [p.marker() for p in ARGO]
 
 @app.get('/api/observations/{platform}/{cycle}/profile',response_model=ProfileResponse)
-def profile(platform,cycle):
+def profile(platform: str,cycle: int):
     try:return fetch_argo_profile(platform,cycle).response()
     except Exception as e:return error_response(404,'OBSERVATION_UNAVAILABLE',str(e))
 
 @app.get('/api/comparisons/profile')
-def comparison(platform,cycle,field_id='temperature'):
+def comparison(platform: str,cycle: int,field_id='temperature'):
     try:p=fetch_argo_profile(platform,cycle)
     except Exception as e:return error_response(404,'OBSERVATION_UNAVAILABLE',str(e))
     f=FIELDS.get(field_id)
